@@ -1,0 +1,74 @@
+---
+title: "DATA 607 — Project 1 (Approach): Chess Tournament Cross-Table"
+author: "Izza Khan"
+format:
+  html:
+    embed-resources: true
+---
+
+## Introduction
+
+For Project 1, I will use the provided USCF chess tournament cross-table text file (`tournamentinfo.txt`) and convert it into a tidy dataset that can be analyzed in R. The goal is to produce a clean table where each player has (1) their name, (2) their state, (3) their total points, (4) their pre-tournament rating, and (5) the **average pre-tournament rating of their opponents**. Data source: `tournamentinfo.txt` (Brightspace link provided in the assignment), plus the optional overview video on reading cross-tables: <https://youtu.be/T5PXYl2FEUo.>
+
+## Planned Approach
+
+### 1) Understand the structure of the raw file
+
+The file is a “fixed layout” text report where each player is represented across **two lines**:
+
+-   Line 1 includes the **pair number**, **player name**, **total points**, and then the **round-by-round results** (like `W 39`, `L 4`, `D 12`, `H`, `U`, `B`, `X`).
+-   Line 2 includes the **state**, **USCF ID**, and **pre/post rating** formatted like: `R: 1794   ->1817`.
+
+Before transforming anything, I’ll do a quick “shape check”: - Confirm each player block is exactly 2 lines (with separator lines between). - Confirm there are 64 players and 7 rounds in this tournament file.
+
+### 2) Parse player-level fields into a base player table
+
+I’ll create a player table with one row per player including: - `pair_num` - `player_name` - `state` - `uscf_id` - `total_points` - `pre_rating`
+
+My plan is to: - Read the full text from a **URL** (not a local path) so the work is reproducible. - Use string cleaning tools to remove separator lines and keep only player blocks. - Extract fields using a combination of: - splitting by the pipe `|` delimiter (since the report visually uses pipes) - regular expressions to pull out the pre-rating from the rating line (the number after `R:` and before `->`)
+
+### 3) Parse opponents from the round results
+
+Next, I’ll build a second table where each row represents “one player in one round”: - `pair_num` (the player) - `round` (1 through 7) - `result` (W/L/D/H/U/B/X) - `opponent_pair_num` (when present)
+
+Most rounds look like `W 39` (meaning opponent is pair #39). Some entries like `H`, `U`, `B`, or `X` do not include an opponent number, so those will be treated carefully.
+
+I’ll “pivot longer” the round columns into a tidy format so calculations are easier.
+
+### 4) Join opponent ratings and compute average opponent pre-rating
+
+Once I have: - the player table (with each player’s `pre_rating`) - the round/opponent table (with each `opponent_pair_num`)
+
+…I can join opponent info back in: - Join `opponent_pair_num` → opponent’s `pre_rating` - Group by the player and compute the mean opponent pre-rating
+
+Important detail: I’ll decide how to handle special round values: - `H` (half-point bye), `U` (unplayed), `B` (bye), `X` (forfeit win) usually do **not** represent an actual opponent. - My default plan is to **exclude those from the opponent-average** calculation, because there’s no real opponent rating to include. - I’ll document this clearly in the analysis text, and I can optionally compare results if I included them as missing vs. excluded.
+
+### 5) Final output table (the required deliverable)
+
+The final cleaned table will have (at minimum) these columns: - Player Name - Player State - Total Points - Player Pre-Rating - Average Opponent Pre-Rating
+
+I’ll also include a quick sanity check: - Spot check a few players manually from the raw text to make sure opponent lists were extracted correctly. - Confirm average opponent rating values look reasonable (not `NA` for players who played real opponents).
+
+## Anticipated Data Challenges
+
+### Fixed-format text parsing is messy
+
+This isn’t a CSV—so the biggest challenge is reliably extracting fields without accidentally grabbing separators, spacing differences, or misaligned text.
+
+### Two-line player records
+
+Each player is spread across two lines, so I need to correctly “pair” the lines. If the text has any weird breaks, it could shift the pairing and ruin the output. I’ll build the logic so it’s robust (example: detect pair numbers on line 1 and state/ID/rating on line 2).
+
+### Special round codes (H/U/B/X)
+
+Some rounds don’t list an opponent number. If I treat these like normal rounds, the opponent join will fail or create missing values. I will explicitly code the logic to: - extract opponent numbers only when they exist - exclude non-opponent rounds from the average opponent rating calculation
+
+### Consistent numeric parsing
+
+Ratings and IDs should be numeric, but they come with extra characters (`R:`, arrows, etc.). I’ll make sure to strip non-numeric characters carefully so `pre_rating` is a clean integer.
+
+## Reproducibility Plan
+
+-   I will read the raw data from a **web URL** (Brightspace link or a GitHub-hosted copy if needed) so there are no local file paths.
+-   I will include all package calls at the top of the notebook and keep the workflow in one Quarto file.
+-   I will add short narrative notes in the text sections describing each step (what I’m doing and why), especially around the tricky parsing rules.
