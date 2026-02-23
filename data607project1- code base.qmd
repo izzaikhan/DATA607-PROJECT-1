@@ -1,0 +1,86 @@
+---
+title: "DATA607PROJECT 1-CODEBASE"
+format: html
+---
+
+This document contains the reproducible code used to transform the
+USCF chess tournament cross-table text file into a structured dataset.
+
+The final output includes:
+Player Name, State, Total Points, Pre-Tournament Rating,
+and Average Opponent Pre-Tournament Rating.
+
+```{r}
+library(tidyverse)
+
+# Read tournament file
+lines <- readLines("tournamentinfo.txt", warn = FALSE)
+
+# Remove separator lines
+lines_clean <- lines[!grepl("^[-]+", lines)]
+
+# Remove blank rows
+lines_clean <- lines_clean[lines_clean != ""]
+```
+
+```{r}
+# Combine every two lines into one record
+player_blocks <- matrix(lines_clean, ncol = 2, byrow = TRUE)
+
+player_df <- as.data.frame(player_blocks, stringsAsFactors = FALSE)
+colnames(player_df) <- c("line1","line2")
+
+dim(player_df)
+head(player_df)
+```
+
+```{r}
+# Extract state from line2
+player_df$state <- substr(player_df$line2, 1, 2)
+
+# Extract pre-tournament rating
+player_df$pre_rating <- as.numeric(sub(".*R: *([0-9]+).*", "\\1", player_df$line2))
+
+# Preview results
+head(player_df)
+```
+
+
+```{R}
+summary(player_df$pre_rating)
+```
+
+```{r}
+# Split line1 by the pipe character and take the 2nd piece = Player Name
+parts1 <- strsplit(player_df$line1, "\\|")
+
+player_df$player_name <- trimws(sapply(parts1, function(x) x[2]))
+
+# Check result
+player_df[1:6, c("player_name","state","pre_rating")]
+```
+
+```{R}
+player_df <- player_df %>%
+  filter(player_name != "Player Name")
+```
+
+```{R}
+player_df[1:6, c("player_name","state","pre_rating")]
+nrow(player_df)
+```
+
+```{r}
+# Split line1 by pipe
+parts1 <- strsplit(player_df$line1, "\\|")
+
+# pair number is the 1st part
+player_df$pair_num <- as.integer(trimws(sapply(parts1, `[`, 1)))
+
+# total points is the 3rd part
+player_df$total_points <- as.numeric(trimws(sapply(parts1, `[`, 3)))
+
+# check
+player_df[1:6, c("pair_num","player_name","state","total_points","pre_rating")]
+```
+
